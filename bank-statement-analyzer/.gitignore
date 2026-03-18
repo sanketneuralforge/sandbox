@@ -6,3 +6,4 @@ dist/
 build/
 .env
 report_run_*.html
+bank_statement_analyser/
