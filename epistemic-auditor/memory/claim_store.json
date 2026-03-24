@@ -1,0 +1,63 @@
+{
+  "9dbe938422b16599a99e6ee9ee30b5df": {
+    "claim": "5G towers were used to spread COVID-19",
+    "result": {
+      "claim_as_stated": "\"5G towers were used to spread COVID-19\"",
+      "atomic_claims": [
+        "5G technology can transmit viruses like COVID-19.",
+        "COVID-19 is spread through 5G towers."
+      ],
+      "verdict": "FALSE",
+      "confidence": 0.94,
+      "evidence_summary": "Scientific evidence shows that COVID-19 is transmitted through respiratory droplets and close contact, not through 5G technology or towers. The claim originated from misinformation and has been debunked by multiple sources.",
+      "sources": [
+        {
+          "title": "Transmission of SARS-CoV-2: implications for infection prevention precautions",
+          "url": "https://www.who.int/news-room/commentaries/detail/transmission-of-sars-cov-2-implications-for-infection-prevention-precautions",
+          "credibility_score": 0.94
+        },
+        {
+          "title": "eThekwini Mayor rubbishes rumours5GtowersspreadCOVID-19...",
+          "url": "https://www.sabcnews.com/sabcnews/ethekwini-mayor-rubbishes-rumours-5g-towers-spread-covid-19/",
+          "credibility_score": 0.5
+        },
+        {
+          "title": "Covid-19and5G: what happens when... | SOMA Disinfobservatory",
+          "url": "https://www.disinfobservatory.org/covid-19-and-5g-what-happens-when-hoaxes-find-each-other/",
+          "credibility_score": 0.7
+        }
+      ],
+      "why_people_believe_it": "People may believe this claim due to a lack of understanding about how viruses spread and the fear surrounding new technologies like 5G.",
+      "counter_narrative": "COVID-19 spreads through respiratory droplets, not through 5G towers, so dismantling these towers will not stop the virus."
+    },
+    "audited_at": "2026-03-24T18:23:30.867641"
+  },
+  "c4f9889e277df086ff0ccc81077e8fb8": {
+    "claim": "Drinking bleach cures cancer",
+    "result": {
+      "claim_as_stated": "Drinking bleach cures cancer",
+      "atomic_claims": [
+        "Bleach can cure cancer",
+        "It is safe to drink bleach"
+      ],
+      "verdict": "FALSE",
+      "confidence": 1.0,
+      "evidence_summary": "There is no scientific evidence supporting the claim that drinking bleach can cure cancer. The FDA has explicitly warned against consuming bleach, and it is widely recognized as dangerous and ineffective for treating any medical condition.",
+      "sources": [
+        {
+          "title": "FDA Begs Public to Please Stop Drinking Bleach",
+          "url": "https://www.rollingstone.com/culture/culture-news/master-mineral-solution-mms-fda-warning-bleach-871774/",
+          "credibility_score": 0.5
+        },
+        {
+          "title": "The FDA Is Literally Warning People Not to Drink Bleach Now",
+          "url": "https://www.sciencealert.com/the-fda-is-literally-warning-people-not-to-drink-bleach-now",
+          "credibility_score": 0.5
+        }
+      ],
+      "why_people_believe_it": "Some people may believe this due to misinformation spread by unscrupulous individuals or groups promoting pseudoscientific remedies.",
+      "counter_narrative": "Drinking bleach is extremely dangerous and can cause severe harm or death; always consult healthcare professionals for medical advice."
+    },
+    "audited_at": "2026-03-24T18:25:59.612921"
+  }
+}
