@@ -9,7 +9,7 @@ log = get_logger("base_agent")
 
 class BaseAgent:
 
-    MAX_TURNS = 8
+    MAX_TURNS = 6
     name = "BaseAgent"
 
     def __init__(self):
