@@ -6,6 +6,7 @@ import numpy as np
 from pathlib import Path
 from datetime import datetime
 from sentence_transformers import SentenceTransformer
+from config import MEMORY_STORAGE_PATH, SIMILARITY_THRESHOLD
 
 class ClaimMemory:
     """
@@ -20,11 +21,11 @@ class ClaimMemory:
     # How similar two claims must be to count as the same.
     # 0.92 is tight enough to avoid false positives but catches
     # clear paraphrases. Tune this if you get false hits.
-    SIMILARITY_THRESHOLD = 0.92
+    # SIMILARITY_THRESHOLD = 0.92
 
-    def __init__(self, storage_path: str = "memory/claim_store.json"):
-        self.storage_path = Path(storage_path)
-        self.storage_path.parent.mkdir(parents=True, exist_ok=True)
+    def __init__(self, storage_path: str = None):
+        self.storage_path = Path(storage_path or MEMORY_STORAGE_PATH)
+        self.SIMILARITY_THRESHOLD = SIMILARITY_THRESHOLD
         self._store = self._load()
 
         # Load embedding model once — reused for every lookup and store

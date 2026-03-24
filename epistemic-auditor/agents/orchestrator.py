@@ -1,5 +1,6 @@
-# agents/orchestrator.py
+# agents/orchestrator.py — full updated file
 
+import asyncio
 from agents.decomposer import DecomposerAgent
 from agents.archaeologist import ArchaeologistAgent
 from agents.psychologist_writer import PsychologistWriterAgent
@@ -9,6 +10,7 @@ from guardrails.output import OutputGuardrail
 from hitl.gate import HITLGate
 from models import AuditResult, Verdict
 from logger import get_logger
+from config import HITL_ENABLED, HITL_CONFIDENCE_THRESHOLD
 
 log = get_logger("orchestrator")
 
@@ -22,9 +24,11 @@ class OrchestratorAgent:
         self.input_guard   = InputGuardrail()
         self.output_guard  = OutputGuardrail()
         self.hitl          = HITLGate()
-        self.enable_hitl   = enable_hitl
+        self.enable_hitl = enable_hitl if enable_hitl is not None else HITL_ENABLED
 
     async def audit(self, claim: str) -> AuditResult:
+        import time
+        start_time = time.time()
 
         # ── Input guardrail ────────────────────────────────────────
         validation = self.input_guard.validate(claim)
@@ -32,7 +36,6 @@ class OrchestratorAgent:
             log.warning(f"Input rejected: {validation.rejection_reason}")
             return self._rejected_result(claim, validation.rejection_reason)
 
-        # Use the normalized claim from here on
         claim = validation.claim
 
         # ── Check memory ───────────────────────────────────────────
@@ -45,14 +48,21 @@ class OrchestratorAgent:
         log.info(f"Starting full audit: '{claim}'")
         print(f"\n[Orchestrator] Starting full audit: '{claim}'")
 
-        # ── Run the three agents ───────────────────────────────────
-        print("[Orchestrator] Step 1/3: Decomposing claim...")
-        decomposition = await self.decomposer.decompose(claim)
+        # ── Parallel execution: Decomposer + Archaeologist ─────────
+        # These are independent — no reason to run sequentially.
+        # asyncio.gather() runs both concurrently and waits for both.
+        print("[Orchestrator] Running Decomposer + Archaeologist in parallel...")
+        decomposition, archaeology = await asyncio.gather(
+            self.decomposer.decompose(claim),
+            self.archaeologist.trace(claim),
+        )
 
-        print("[Orchestrator] Step 2/3: Tracing origin...")
-        archaeology = await self.archaeologist.trace(claim)
+        parallel_time = time.time() - start_time
+        log.info(f"Parallel agents completed in {parallel_time:.1f}s")
+        print(f"[Orchestrator] Parallel agents done in {parallel_time:.1f}s")
 
-        print("[Orchestrator] Step 3/3: Analyzing psychology...")
+        # ── Sequential: PsychologistWriter needs both results ──────
+        print("[Orchestrator] Running PsychologistWriter...")
         psychology = await self.psych_writer.analyze(
             claim, decomposition, archaeology
         )
@@ -102,19 +112,44 @@ class OrchestratorAgent:
         # ── HITL gate ──────────────────────────────────────────────
         if self.enable_hitl and self.hitl.should_interrupt(result, output_validation):
             decision = self.hitl.request_review(result, output_validation)
-
             if decision.action == "reject":
                 log.info("Audit rejected by human reviewer")
-                return self._rejected_result(claim, f"Rejected by reviewer: {decision.notes}")
+                return self._rejected_result(
+                    claim, f"Rejected by reviewer: {decision.notes}"
+                )
+            log.info(f"Audit approved: {decision.notes}")
 
-            log.info(f"Audit approved by human reviewer: {decision.notes}")
+        # ── Gmail MCP notification ─────────────────────────────────
+        await self._notify(result)
 
         # ── Store and return ───────────────────────────────────────
         self.memory.store(claim, result.model_dump())
-        log.info(f"Audit complete. Verdict: {result.verdict} "
+
+        total_time = time.time() - start_time
+        log.info(f"Audit complete in {total_time:.1f}s. "
+                 f"Verdict: {result.verdict} "
                  f"(confidence: {result.confidence:.2f})")
-        print(f"\n[Orchestrator] Audit complete. Verdict: {result.verdict}")
+        print(f"\n[Orchestrator] Audit complete in {total_time:.1f}s. "
+              f"Verdict: {result.verdict}")
         return result
+
+    async def _notify(self, result: AuditResult):
+        """
+        Send audit report via Gmail MCP.
+        Only fires for high-confidence FALSE verdicts — 
+        these are the ones worth alerting on.
+        """
+        verdict = result.verdict.value if hasattr(result.verdict, 'value') \
+                  else result.verdict
+
+        if verdict == "FALSE" and result.confidence >= 0.7:
+            try:
+                from integrations.gmail_mcp import GmailMCP
+                gmail = GmailMCP()
+                await gmail.send_audit_report(result)
+            except Exception as e:
+                # Never let notification failure break the audit
+                log.warning(f"Gmail notification failed (non-fatal): {e}")
 
     def _rejected_result(self, claim: str, reason: str) -> AuditResult:
         return AuditResult(

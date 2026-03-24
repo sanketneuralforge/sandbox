@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from models import AuditResult
 from guardrails.output import OutputValidationResult
 from logger import get_logger
+from config import HITL_CONFIDENCE_THRESHOLD
 
 log = get_logger("hitl_gate")
 
@@ -28,10 +29,9 @@ class HITLGate:
     """
 
     def should_interrupt(self, result, validation) -> bool:
-        if validation.requires_human_review:
+        if result.confidence < HITL_CONFIDENCE_THRESHOLD:
             return True
-
-        if result.confidence < 0.5:   # was 0.3 — raise threshold
+        if validation.requires_human_review:
             return True
 
         verdict = result.verdict.value if hasattr(result.verdict, 'value') \

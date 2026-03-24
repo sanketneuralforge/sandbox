@@ -1,33 +1,23 @@
-# llm/client.py
+# llm/client.py — full updated file
 
 import os
-from enum import Enum
+import asyncio
 from dataclasses import dataclass
-from typing import Optional
+from config import LLM_PROVIDER, OLLAMA_MODEL, ANTHROPIC_MODEL, ANTHROPIC_API_KEY
+from enum import Enum
 
-# ── provider selection ────────────────────────────────────────────
 class Provider(Enum):
-    OLLAMA = "ollama"
+    OLLAMA    = "ollama"
     ANTHROPIC = "anthropic"
 
-# Change this ONE line to switch providers
-ACTIVE_PROVIDER = Provider.OLLAMA
+ACTIVE_PROVIDER = Provider(LLM_PROVIDER)
 
-# ── message format (same structure both providers understand) ─────
 @dataclass
 class Message:
-    role: str      # "user" or "assistant"
+    role: str
     content: str
 
-# ── the unified client ────────────────────────────────────────────
 class LLMClient:
-    """
-    One class. Two providers. Identical interface.
-    
-    Usage:
-        client = LLMClient()
-        response = await client.complete(messages, system_prompt)
-    """
 
     def __init__(self):
         self.provider = ACTIVE_PROVIDER
@@ -35,13 +25,12 @@ class LLMClient:
         if self.provider == Provider.OLLAMA:
             import ollama
             self._ollama = ollama
-            self.model = "mistral-small"   # change to any ollama model
+            self.model = "mistral-small"
 
         elif self.provider == Provider.ANTHROPIC:
             import anthropic
-            # Reads ANTHROPIC_API_KEY from environment automatically
             self._anthropic = anthropic.Anthropic()
-            self.model = "claude-haiku-4-5-20251001"  # cheapest Anthropic model
+            self.model = "claude-haiku-4-5-20251001"
 
     async def complete(
         self,
@@ -49,40 +38,41 @@ class LLMClient:
         system_prompt: str,
         max_tokens: int = 2048,
     ) -> str:
-        """
-        Send messages to whichever provider is active.
-        Always returns a plain string — the model's response.
-        """
         if self.provider == Provider.OLLAMA:
             return await self._ollama_complete(messages, system_prompt, max_tokens)
         elif self.provider == Provider.ANTHROPIC:
             return await self._anthropic_complete(messages, system_prompt, max_tokens)
 
-    # ── Ollama implementation ──────────────────────────────────────
     async def _ollama_complete(
         self, messages: list[Message], system_prompt: str, max_tokens: int
     ) -> str:
-        # Ollama expects messages as dicts with role + content
         formatted = [{"role": "system", "content": system_prompt}]
         formatted += [{"role": m.role, "content": m.content} for m in messages]
 
-        # ollama.chat is synchronous, so we call it directly
-        # (we'll make this properly async in Stage 7)
-        response = self._ollama.chat(
-            model=self.model,
-            messages=formatted,
-            options={"num_predict": max_tokens},
+        # ── Key fix: run sync ollama.chat in a thread pool ─────────
+        # This frees the event loop so asyncio.gather() actually
+        # runs agents in parallel instead of blocking sequentially.
+        loop = asyncio.get_event_loop()
+        response = await loop.run_in_executor(
+            None,  # uses default ThreadPoolExecutor
+            lambda: self._ollama.chat(
+                model=self.model,
+                messages=formatted,
+                options={"num_predict": max_tokens},
+            )
         )
         return response["message"]["content"]
 
-    # ── Anthropic implementation ───────────────────────────────────
     async def _anthropic_complete(
         self, messages: list[Message], system_prompt: str, max_tokens: int
     ) -> str:
-        # Anthropic takes system separately from messages
         formatted = [{"role": m.role, "content": m.content} for m in messages]
 
-        response = self._anthropic.messages.create(
+        # Anthropic SDK has native async — use it directly
+        # Switch to AsyncAnthropic for proper async support
+        import anthropic
+        async_client = anthropic.AsyncAnthropic()
+        response = await async_client.messages.create(
             model=self.model,
             system=system_prompt,
             messages=formatted,
