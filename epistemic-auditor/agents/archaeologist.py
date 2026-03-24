@@ -26,7 +26,7 @@ class ArchaeologistAgent(BaseAgent):
             PropagationPoint(
                 source=p.get("source", ""),
                 url=p.get("url", ""),
-                credibility_score=float(p.get("credibility_score", 0.5)),
+                credibility_score=float(p.get("credibility_score") or 0.5),
                 role=p.get("role", "amplifier"),
             )
             for p in data.get("propagation_points", [])

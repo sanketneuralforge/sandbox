@@ -9,6 +9,7 @@ async def main():
 
     claims = [
         "5G towers were used to spread COVID-19",
+        "5G towers spread COVID-19",
         "Vaccines cause autism",
     ]
 

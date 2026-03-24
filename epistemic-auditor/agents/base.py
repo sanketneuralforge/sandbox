@@ -17,18 +17,13 @@ class BaseAgent:
     - parse_result(response) -> their specific output model
     """
 
-    MAX_TURNS = 6
+    MAX_TURNS = 8
     name = "BaseAgent"
 
     def __init__(self):
         self.llm = LLMClient()
 
     async def run(self, user_message: str) -> str:
-        """
-        Runs the tool-calling loop for this agent.
-        Returns the raw final response string.
-        Subclasses call this and then parse the result.
-        """
         messages = [Message(role="user", content=user_message)]
 
         for turn in range(self.MAX_TURNS):
@@ -44,6 +39,24 @@ class BaseAgent:
             tool_call = self._parse_tool_call(response)
             if tool_call and hasattr(self, 'tools') and self.tools:
                 tool_name, argument = tool_call
+
+                # ── Turn budget warning ────────────────────────────────
+                # When 2 turns remain, stop allowing tool calls and
+                # force the agent to synthesize what it already has.
+                # This is the key fix for small models that over-search.
+                if turn >= self.MAX_TURNS - 2:
+                    print(f"  [{self.name}] Turn budget low — forcing synthesis")
+                    messages.append(Message(
+                        role="user",
+                        content=(
+                            "You have used most of your available turns. "
+                            "Do NOT call any more tools. "
+                            "Synthesize what you have found so far and respond "
+                            "with FINAL_ANSWER: followed by your JSON immediately."
+                        )
+                    ))
+                    continue
+
                 print(f"  [{self.name}] → {tool_name}({argument[:40]}...)")
                 result = self.tools.execute(tool_name, argument)
                 messages.append(Message(
@@ -62,7 +75,21 @@ class BaseAgent:
                 content="Continue. Call a tool or give FINAL_ANSWER: with your JSON."
             ))
 
-        return "FINAL_ANSWER: {}"  # safe fallback
+        # Last resort — explicitly ask for output with whatever was gathered
+        print(f"  [{self.name}] Max turns reached — extracting best effort response")
+        messages.append(Message(
+            role="user",
+            content=(
+                "STOP. You must now respond with FINAL_ANSWER: followed by "
+                "your JSON using whatever information you have gathered. "
+                "Do not call any more tools. Produce the JSON now."
+            )
+        ))
+        final = await self.llm.complete(
+            messages=messages,
+            system_prompt=self.get_system_prompt(),
+        )
+        return final
 
     def get_system_prompt(self) -> str:
         raise NotImplementedError("Subclasses must implement get_system_prompt()")
