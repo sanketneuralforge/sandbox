@@ -1,21 +1,13 @@
-# agents/base.py
+# agents/base.py — full updated file
 
 import re
 import json
 from llm.client import LLMClient, Message
+from logger import get_logger
+
+log = get_logger("base_agent")
 
 class BaseAgent:
-    """
-    Every agent inherits this. Provides:
-    - The tool-calling loop
-    - Tool call parsing
-    - JSON extraction from responses
-    
-    Subclasses only need to define:
-    - system_prompt
-    - tools (a ToolRegistry or None)
-    - parse_result(response) -> their specific output model
-    """
 
     MAX_TURNS = 8
     name = "BaseAgent"
@@ -23,10 +15,27 @@ class BaseAgent:
     def __init__(self):
         self.llm = LLMClient()
 
-    async def run(self, user_message: str) -> str:
-        messages = [Message(role="user", content=user_message)]
+    async def run(self, user_message: str, rag_context: str = "") -> str:
+        """
+        Runs the tool-calling loop.
+        
+        rag_context: formatted past audits from ChromaDB.
+        If provided, prepended to the first user message.
+        """
+        # ── Inject RAG context into first message ──────────────────
+        # We prepend it to the user message, not the system prompt.
+        # Why? System prompts are static — RAG context is dynamic
+        # and specific to this claim. Keeping them separate makes
+        # the system prompt cacheable and the RAG context fresh.
+        if rag_context:
+            full_message = f"{rag_context}\n\n{'='*50}\n\nNow audit this:\n{user_message}"
+        else:
+            full_message = user_message
+
+        messages = [Message(role="user", content=full_message)]
 
         for turn in range(self.MAX_TURNS):
+            log.info(f"[{self.name}] Turn {turn + 1}")
             print(f"  [{self.name}] Turn {turn + 1}")
 
             response = await self.llm.complete(
@@ -40,10 +49,6 @@ class BaseAgent:
             if tool_call and hasattr(self, 'tools') and self.tools:
                 tool_name, argument = tool_call
 
-                # ── Turn budget warning ────────────────────────────────
-                # When 2 turns remain, stop allowing tool calls and
-                # force the agent to synthesize what it already has.
-                # This is the key fix for small models that over-search.
                 if turn >= self.MAX_TURNS - 2:
                     print(f"  [{self.name}] Turn budget low — forcing synthesis")
                     messages.append(Message(
@@ -65,24 +70,22 @@ class BaseAgent:
                 ))
                 continue
 
-            # Check for final answer
             if "FINAL_ANSWER:" in response:
                 return response
 
-            # Nudge if neither
             messages.append(Message(
                 role="user",
                 content="Continue. Call a tool or give FINAL_ANSWER: with your JSON."
             ))
 
-        # Last resort — explicitly ask for output with whatever was gathered
-        print(f"  [{self.name}] Max turns reached — extracting best effort response")
+        # Last resort
+        print(f"  [{self.name}] Max turns reached — extracting best effort")
         messages.append(Message(
             role="user",
             content=(
-                "STOP. You must now respond with FINAL_ANSWER: followed by "
-                "your JSON using whatever information you have gathered. "
-                "Do not call any more tools. Produce the JSON now."
+                "STOP. Respond with FINAL_ANSWER: followed by "
+                "your JSON using whatever you have gathered. "
+                "Do not call any more tools."
             )
         ))
         final = await self.llm.complete(
@@ -92,7 +95,7 @@ class BaseAgent:
         return final
 
     def get_system_prompt(self) -> str:
-        raise NotImplementedError("Subclasses must implement get_system_prompt()")
+        raise NotImplementedError
 
     def _parse_tool_call(self, response: str):
         match = re.search(
@@ -104,10 +107,6 @@ class BaseAgent:
         return None
 
     def _extract_json(self, response: str) -> dict:
-        """
-        Extracts JSON from a FINAL_ANSWER: response.
-        Shared by all agents — every agent returns JSON.
-        """
         try:
             after = response.split("FINAL_ANSWER:")[-1].strip()
             cleaned = re.sub(r"```(?:json)?", "", after).strip().rstrip("`")
@@ -115,5 +114,5 @@ class BaseAgent:
             end = cleaned.rfind("}") + 1
             return json.loads(cleaned[start:end])
         except Exception as e:
-            print(f"  [{self.name}] JSON parse failed: {e}")
+            log.error(f"[{self.name}] JSON parse failed: {e}")
             return {}

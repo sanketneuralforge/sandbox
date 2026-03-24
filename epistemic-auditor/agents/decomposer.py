@@ -17,9 +17,12 @@ class DecomposerAgent(BaseAgent):
             tool_descriptions=self.tools.tool_descriptions
         )
 
-    async def decompose(self, claim: str) -> DecompositionResult:
+    async def decompose(self, claim: str, rag_context: str = "") -> DecompositionResult:
         print(f"\n[Decomposer] Starting on: '{claim[:60]}...'")
-        response = await self.run(f'Decompose and verify this claim: "{claim}"')
+        response = await self.run(
+            f'Decompose and verify this claim: "{claim}"',
+            rag_context=rag_context,
+        )
         data = self._extract_json(response)
 
         # Parse into typed model with safe fallbacks

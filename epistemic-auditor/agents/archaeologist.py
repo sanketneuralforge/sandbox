@@ -17,9 +17,12 @@ class ArchaeologistAgent(BaseAgent):
             tool_descriptions=self.tools.tool_descriptions
         )
 
-    async def trace(self, claim: str) -> ArchaeologyResult:
+    async def trace(self, claim: str, rag_context: str = "") -> ArchaeologyResult:
         print(f"\n[Archaeologist] Tracing origin of: '{claim[:60]}...'")
-        response = await self.run(f'Trace the origin and spread of: "{claim}"')
+        response = await self.run(
+            f'Trace the origin and spread of: "{claim}"',
+            rag_context=rag_context,
+        )
         data = self._extract_json(response)
 
         points = [

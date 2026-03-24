@@ -55,25 +55,22 @@ class PsychologistWriterAgent(BaseAgent):
     async def analyze(
         self,
         claim: str,
-        decomposition: DecompositionResult,
-        archaeology: ArchaeologyResult,
+        decomposition,
+        archaeology,
+        rag_context: str = "",
     ) -> PsychologyResult:
         print(f"\n[PsychologistWriter] Analyzing belief patterns...")
 
-        # This agent gets the findings from other agents as context
-        # This is the key pattern: agents pass state to each other
         context = f"""
-Claim: "{claim}"
+    Claim: "{claim}"
+    Verdict from Decomposer: {decomposition.overall_verdict}
+    Atomic claims found: {[c.text for c in decomposition.atomic_claims]}
+    Origin hypothesis: {archaeology.origin_hypothesis}
+    How it spread: {archaeology.timeline_summary}
 
-Verdict from Decomposer: {decomposition.overall_verdict}
-Atomic claims found: {[c.text for c in decomposition.atomic_claims]}
-
-Origin hypothesis: {archaeology.origin_hypothesis}
-How it spread: {archaeology.timeline_summary}
-
-Now explain why people believe this and write a counter-narrative.
-"""
-        response = await self.run(context)
+    Now explain why people believe this and write a counter-narrative.
+    """
+        response = await self.run(context, rag_context=rag_context)
         data = self._extract_json(response)
 
         return PsychologyResult(

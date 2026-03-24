@@ -24,3 +24,9 @@ HITL_CONFIDENCE_THRESHOLD = float(os.getenv("HITL_CONFIDENCE_THRESHOLD", "0.5"))
 
 # Evals
 EVAL_USE_LLM_JUDGE        = os.getenv("EVAL_USE_LLM_JUDGE", "true").lower() == "true"
+
+# ChromaDB
+CHROMA_PERSIST_PATH  = os.getenv("CHROMA_PERSIST_PATH", "memory/chroma_db")
+CHROMA_COLLECTION    = os.getenv("CHROMA_COLLECTION", "epistemic_audits")
+RAG_TOP_K            = int(os.getenv("RAG_TOP_K", "3"))
+RAG_MIN_SIMILARITY   = float(os.getenv("RAG_MIN_SIMILARITY", "0.70"))
